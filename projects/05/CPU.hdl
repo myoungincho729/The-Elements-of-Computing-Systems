@@ -40,4 +40,53 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+
+    //check whether A or C instruction
+    Not(in=instruction[15], out=Ainst);
+    Not(in=Ainst, out=Cinst);
+
+    //D Register
+    And(a=Cinst, b=instruction[4], out=loadD);
+    DRegister(in=aluout, load=loadD, out=registerD);
+
+    //A Register
+    And(a=Cinst, b=instruction[5], out=aluToA);
+    Mux16(a=instruction, b=aluout, sel=aluToA, out=RegAVal);
+
+    Or(a=Ainst, b=aluToA, out=loadA);    
+    ARegister(in=RegAVal, load=loadA, out=registerA);
+
+    Mux16(a=registerA, b=inM, sel=instruction[12], out=checkAM);
+
+    ALU(x=registerD, y=checkAM, 
+        zx=instruction[11], nx=instruction[10], zy=instruction[9], 
+        ny=instruction[8], f=instruction[7], no=instruction[6], 
+        out=aluout, zr=zero, ng=neg);
+
+    //writeM
+    And(a=Cinst, b=instruction[3], out=writeM);
+    //addressM
+    Or16(a=false, b=registerA, out[0..14]=addressM);
+    //outM
+    Or16(a=false, b=aluout, out=outM);
+
+    //jump condition
+
+    //zero
+    And(a=zero, b=instruction[1], out=jeq);
+    //negative
+    And(a=neg, b=instruction[2], out=jlt);
+    //positive
+    Or(a=zero, b=neg, out=zrOrNeg);
+    Not(in=zrOrNeg, out=pos);
+    And(a=pos, b=instruction[0], out=jgt);
+
+    //c-instruction && jump condition -> PC load
+    Or(a=jeq, b=jlt, out=jout0);
+    Or(a=jout0, b=jgt, out=jump);
+    And(a=Cinst, b=jump, out=jumpLoad);
+    // not PC load -> inc load
+    Not(in=jumpLoad, out=incLoad);
+    //Program Counter
+    PC(in=registerA, load=jumpLoad, inc=incLoad, reset=reset, out[0..14]=pc);
 }
